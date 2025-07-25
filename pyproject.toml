@@ -1,27 +1,61 @@
-[tool.poetry]
-name = "nonebot_plugin_learning_chat"
-version = "0.4.0"
-description = "Nonebot2 plugin to learn what your group members say."
-authors = ["CMHopeSunshine <277073121@qq.com>"]
-keywords = ["nonebot2"]
-homepage = "https://github.com/CMHopeSunshine/nonebot-plugin-learning-chat"
+[project]
+name = "nonebot-plugin-echo"
+version = "0.1.0"
+description = "NoneBot2 插件，让 Bot 学习群友的发言和表情包。/ NoneBot2 plugin to learn what your group members say."
+authors = [
+    { name = "KomoriDev", email = "mute231010@gmail.com" },
+    { name = "CMHopeSunshine", email = "277073121@qq.com" },
+]
+license = { text = "AGPL-3" }
 readme = "README.md"
-license = "AGPL"
+keywords = []
 
-[tool.poetry.dependencies]
-python = "^3.8"
-nonebot2 = { version = "^2.0.0", extras = ["fastapi"] }
-nonebot-adapter-onebot = "^2.1"
-nonebot-plugin-apscheduler = "^0.2.0"
-tortoise-orm = ">=0.20.0"
-jieba = "^0.42.1"
-"ruamel.yaml" = "^0.17.21"
-amis-python = "^1.0.6"
-python-jose = "^3.3.0"
-nonebot-plugin-tortoise-orm = ">=0.1.1"
+requires-python = ">=3.9"
+dependencies = []
 
-[tool.poetry.dev-dependencies]
+[project.urls]
+homepage = "https://github.com/KomoriDev/nonebot-plugin-echo"
+repository = "https://github.com/KomoriDev/nonebot-plugin-echo"
 
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+[dependency-groups]
+dev = [
+    "isort>=6.0.1",
+    "pre-commit>=4.2.0",
+    "ruff>=0.12.5",
+]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+length_sort = true
+skip_gitignore = true
+force_sort_within_sections = true
+extra_standard_library = ["typing_extensions"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "UP", "C", "T", "PYI", "PT", "Q"]
+ignore = ["E402", "C901"]
+
+[tool.ruff.lint.isort]
+length-sort = true
+force-sort-within-sections = true
+extra-standard-library = ["typing_extensions"]
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = false
+mark-parentheses = false
+
+[tool.ruff.lint.pyupgrade]
+keep-runtime-typing = true
+
+[tool.pyright]
+pythonVersion = "3.9"
+pythonPlatform = "All"
+typeCheckingMode = "standard"

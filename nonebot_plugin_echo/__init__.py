@@ -34,7 +34,9 @@ __plugin_meta__ = PluginMetadata(
     type="application",
     homepage="https://github.com/CMHopeSunshine/nonebot-plugin-learning-chat",
     supported_adapters={"~onebot.v11"},
-    extra={"author": "惜月"},
+    extra={
+        "author": "Komorebi <mute231010@gmail.com>"
+    },
 )
 
 
