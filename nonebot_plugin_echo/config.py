@@ -1,39 +1,34 @@
-from typing import List, Dict
 from pathlib import Path
-from pydantic import BaseModel, Field
 
-from nonebot import get_driver, logger
-from nonebot.utils import escape_tag
-from ruamel import yaml
+from ruamel.yaml import YAML
+from pydantic import Field, BaseModel
+from nonebot import get_driver, get_plugin_config
+from pydantic_yaml import to_yaml_file, parse_yaml_file_as
+from nonebot_plugin_localstore import get_plugin_config_dir
 
-CONFIG_PATH = Path() / "data" / "learning_chat" / "learning_chat.yml"
-CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+yaml = YAML(typ="safe")
+yaml.default_flow_style = True
 
-driver = get_driver()
-try:
-    SUPERUSERS: List[int] = [int(s) for s in driver.config.superusers]
-except Exception:
-    SUPERUSERS = []
-    logger.warning("请在.env.prod文件中中配置超级用户SUPERUSERS")
-
-try:
-    NICKNAME: str = list(driver.config.nickname)[0]
-except Exception:
-    NICKNAME = "bot"
-
-COMMAND_START = driver.config.command_start.copy()
-if "" in COMMAND_START:
-    COMMAND_START.remove("")
+config_path = get_plugin_config_dir() / "config.yml"
 
 
-class ChatGroupConfig(BaseModel):
+class EchoConfig(BaseModel):
+    def update(self, **kwargs):
+        for key, value in kwargs.items():
+            if key in self.model_fields:
+                self.__setattr__(key, value)
+
+
+class EchoSceneConfig(EchoConfig):
     enable: bool = Field(default=True, alias="群聊学习开关")
-    ban_words: List[str] = Field(default_factory=list, alias="屏蔽词")
-    ban_users: List[int] = Field(default_factory=list, alias="屏蔽用户")
-    answer_threshold: int = Field(default=4, alias="回复阈值")
-    answer_threshold_weights: List[int] = Field(default=[10, 30, 60], alias="回复阈值权重")
+    ban_words: list[str] = Field(default_factory=list, alias="屏蔽词")
+    ban_users: list[int] = Field(default_factory=list, alias="屏蔽用户")
+    reply_threshold: int = Field(default=4, alias="回复阈值")
+    reply_threshold_weights: list[int] = Field(
+        default=[10, 30, 60], alias="回复阈值权重"
+    )
     repeat_threshold: int = Field(default=3, alias="复读阈值")
-    break_probability: float = Field(default=0.25, alias="打断复读概率")
+    break_repeat_probability: float = Field(default=0.25, alias="打断复读概率")
     speak_enable: bool = Field(default=True, alias="主动发言开关")
     speak_threshold: int = Field(default=5, alias="主动发言阈值")
     speak_min_interval: int = Field(default=300, alias="主动发言最小间隔")
@@ -41,75 +36,59 @@ class ChatGroupConfig(BaseModel):
     speak_continuously_max_len: int = Field(default=3, alias="最大连续主动发言句数")
     speak_poke_probability: float = Field(default=0.5, alias="主动发言附带戳一戳概率")
 
-    def update(self, **kwargs):
-        for key, value in kwargs.items():
-            if key in self.__fields__:
-                self.__setattr__(key, value)
 
-
-class ChatConfig(BaseModel):
-    total_enable: bool = Field(default=True, alias="群聊学习总开关")
-    enable_web: bool = Field(default=True, alias="启用后台管理")
-    web_username: str = Field(default="chat", alias="后台管理用户名")
-    web_password: str = Field(default="admin", alias="后台管理密码")
-    web_secret_key: str = Field(
-        default="49c294d32f69b732ef6447c18379451ce1738922a75cd1d4812ef150318a2ed0",
-        alias="后台管理token密钥",
+class EchoGlobalConfig(EchoConfig):
+    ban_words: list[str] = Field(default_factory=list, description="全局屏蔽词")
+    ban_users: list[int] = Field(default_factory=list, description="全局屏蔽用户")
+    sentence_keyword_count: int = Field(
+        default=3,
+        description="单句句关键词数量",
     )
-    ban_words: List[str] = Field(default_factory=list, alias="全局屏蔽词")
-    ban_users: List[int] = Field(default_factory=list, alias="全局屏蔽用户")
-    KEYWORDS_SIZE: int = Field(default=3, alias="单句关键词分词数量")
-    cross_group_threshold: int = Field(default=3, alias="跨群回复阈值")
+    cross_scene_reply_threshold: int = Field(
+        default=3,
+        description="跨场景回复阈值",
+    )
     learn_max_count: int = Field(default=6, alias="最高学习次数")
-    dictionary: List[str] = Field(default_factory=list, alias="自定义词典")
-    group_config: Dict[int, ChatGroupConfig] = Field(default_factory=dict, alias="分群配置")
-
-    def update(self, **kwargs):
-        for key, value in kwargs.items():
-            if key in self.__fields__:
-                self.__setattr__(key, value)
+    dictionary: list[str] = Field(default_factory=list, description="自定义词典")
+    scene_config: dict[str, EchoSceneConfig] = Field(
+        default_factory=dict,
+        description="场景配置",
+    )
 
 
-class ChatConfigManager:
-    def __init__(self):
-        self.file_path = CONFIG_PATH
-        if self.file_path.exists():
-            self.config = ChatConfig.parse_obj(
-                yaml.load(
-                    self.file_path.read_text(encoding="utf-8"), Loader=yaml.Loader
-                )
-            )
+class EchoConfigManager:
+    def __init__(self) -> None:
+        self._cfg_path = Path(plugin_config.external_config)
+        if self._cfg_path.exists():
+            self._config = parse_yaml_file_as(EchoGlobalConfig, self._cfg_path)
         else:
-            self.config = ChatConfig()
+            self._config = EchoGlobalConfig()
         self.save()
 
-    def get_group_config(self, group_id: int) -> ChatGroupConfig:
-        if group_id not in self.config.group_config:
-            self.config.group_config[group_id] = ChatGroupConfig()
+    def get_scene_config(self, scene_id: str) -> EchoSceneConfig:
+        if scene_id not in self._config.scene_config:
+            self._config.scene_config[scene_id] = EchoSceneConfig()
             self.save()
-        return self.config.group_config[group_id]
+        return self._config.scene_config[scene_id]
 
-    @property
-    def config_list(self) -> List[str]:
-        return list(self.config.dict(by_alias=True).keys())
+    def get_global_config(self) -> EchoGlobalConfig:
+        return self._config
 
-    def save(self):
-        with self.file_path.open("w", encoding="utf-8") as f:
-            yaml.dump(
-                self.config.dict(by_alias=True),
-                f,
-                indent=2,
-                Dumper=yaml.RoundTripDumper,
-                allow_unicode=True,
-            )
+    def save(self) -> None:
+        to_yaml_file(self._cfg_path, self._config, custom_yaml_writer=yaml)
 
 
-config_manager = ChatConfigManager()
+class ScopedConfig(BaseModel):
+    enable_webui: bool = Field(default=True)
+    external_config: str = Field(default=str(config_path))
 
 
-def log_debug(command: str, info: str):
-    logger.opt(colors=True).debug(f"<u><y>[{command}]</y></u>{escape_tag(info)}")
+class Config(BaseModel):
+    echo: ScopedConfig = Field(default_factory=ScopedConfig)
+    """Echo Plugin Config"""
 
 
-def log_info(command: str, info: str):
-    logger.opt(colors=True).info(f"<u><y>[{command}]</y></u>{escape_tag(info)}")
+global_config = get_driver().config
+plugin_config = get_plugin_config(Config).echo
+
+config_manager = EchoConfigManager()
